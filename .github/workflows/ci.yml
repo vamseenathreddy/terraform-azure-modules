@@ -1,0 +1,64 @@
+name: terraform-ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  validate:
+    name: Format, Validate & Lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [vnet, aks, key-vault, app-service, storage-account, acr, log-analytics]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init & validate
+        working-directory: modules/${{ matrix.module }}
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Setup tflint
+        uses: terraform-linters/setup-tflint@v4
+
+      - name: Run tflint
+        working-directory: modules/${{ matrix.module }}
+        run: |
+          tflint --init --config "${GITHUB_WORKSPACE}/.tflint.hcl"
+          tflint --config "${GITHUB_WORKSPACE}/.tflint.hcl"
+
+  security:
+    name: Security Scans
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkov (IaC misconfiguration scan)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: modules/
+          framework: terraform
+          quiet: true
+          soft_fail: false
+
+      - name: Gitleaks (secret scan)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
