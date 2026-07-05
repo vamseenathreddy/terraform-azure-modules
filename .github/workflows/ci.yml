@@ -43,15 +43,13 @@ jobs:
           tflint --init --config "${GITHUB_WORKSPACE}/.tflint.hcl"
           tflint --config "${GITHUB_WORKSPACE}/.tflint.hcl"
 
-  security:
-    name: Security Scans
+  checkov:
+    name: Checkov (IaC misconfiguration scan)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
-      - name: Checkov (IaC misconfiguration scan)
+      - name: Run checkov
         uses: bridgecrewio/checkov-action@v12
         with:
           directory: modules/
@@ -59,7 +57,15 @@ jobs:
           quiet: true
           soft_fail: false
 
-      - name: Gitleaks (secret scan)
+  gitleaks:
+    name: Gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
