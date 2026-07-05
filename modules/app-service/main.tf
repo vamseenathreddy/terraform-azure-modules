@@ -59,9 +59,11 @@ resource "azurerm_linux_web_app" "this" {
 
   # Outbound traffic through the VNet when integrated
   virtual_network_subnet_id = var.vnet_integration_subnet_id
-  vnet_route_all_enabled    = var.vnet_integration_subnet_id != null
 
   site_config {
+    # Route ALL outbound traffic (including DNS) through the integrated VNet.
+    vnet_route_all_enabled = var.vnet_integration_subnet_id != null
+
     minimum_tls_version = "1.2"
     http2_enabled       = true
     ftps_state          = "Disabled"

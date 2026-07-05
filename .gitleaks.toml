@@ -1,0 +1,19 @@
+# Gitleaks configuration
+# Copyright (c) 2026 G Vamseenath Reddy. Licensed under the MIT License.
+#
+# Extends the default ruleset. The only allowlisted pattern is the Azure
+# Key Vault app-setting REFERENCE syntax:
+#
+#   @Microsoft.KeyVault(SecretUri=https://<vault>.vault.azure.net/secrets/<name>/)
+#
+# This is a pointer telling App Service where to fetch a secret at runtime —
+# it contains no secret material itself. Everything else stays fully scanned.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Azure Key Vault reference syntax used in documentation and examples"
+regexes = [
+  '''@Microsoft\.KeyVault\(SecretUri=[^)]*\)''',
+]
