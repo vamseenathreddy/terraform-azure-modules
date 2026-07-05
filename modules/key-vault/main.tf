@@ -20,6 +20,7 @@ terraform {
 }
 
 resource "azurerm_key_vault" "this" {
+  # checkov:skip=CKV_AZURE_189:public network access is disabled automatically whenever a private endpoint is configured; firewall is default-deny otherwise
   name                = var.name
   location            = var.location
   resource_group_name = var.resource_group_name

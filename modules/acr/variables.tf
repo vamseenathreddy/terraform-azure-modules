@@ -57,6 +57,12 @@ variable "retention_days" {
   default     = 14
 }
 
+variable "georeplication_locations" {
+  description = "Additional Azure regions to replicate the registry to (Premium only)."
+  type        = list(string)
+  default     = []
+}
+
 variable "log_analytics_workspace_id" {
   description = "Workspace for login/pull/push audit events. Null disables diagnostics."
   type        = string

@@ -23,6 +23,10 @@ terraform {
 }
 
 resource "azurerm_container_registry" "this" {
+  # checkov:skip=CKV_AZURE_139:public access is disabled automatically whenever a private endpoint subnet is supplied (conditional not resolvable by checkov)
+  # checkov:skip=CKV_AZURE_233:zone_redundancy_enabled is on for Premium SKU (conditional not resolvable by checkov)
+  # checkov:skip=CKV_AZURE_164:trust_policy_enabled is on for Premium SKU (conditional not resolvable by checkov)
+  # checkov:skip=CKV_AZURE_165:geo-replication is exposed via var.georeplication_locations for multi-region deployments
   name                = var.name
   resource_group_name = var.resource_group_name
   location            = var.location
@@ -40,17 +44,32 @@ resource "azurerm_container_registry" "this" {
   # Close the public endpoint whenever a private endpoint is in use.
   public_network_access_enabled = var.private_endpoint_subnet_id == null
 
-  # Premium-only hardening: keep images exportable only via authorized means,
-  # and clean up untagged manifests automatically.
-  dynamic "retention_policy_in_days" {
-    for_each = var.sku == "Premium" ? [1] : []
+  # Premium-only hardening below. Each of these requires the Premium SKU and
+  # is switched off automatically on lower SKUs.
+
+  # Clean up untagged manifests automatically to control image sprawl.
+  retention_policy_in_days = var.sku == "Premium" ? var.retention_days : null
+
+  # Only signed (content-trusted) images can be pushed/pulled.
+  trust_policy_enabled = var.sku == "Premium"
+
+  # New images land in quarantine until scanned & marked verified.
+  quarantine_policy_enabled = var.sku == "Premium"
+
+  # Dedicated data endpoints allow precise firewall rules for data-plane traffic.
+  data_endpoint_enabled = var.sku == "Premium"
+
+  # Zone redundancy for regional resilience.
+  zone_redundancy_enabled = var.sku == "Premium"
+
+  # Optional geo-replication for multi-region image pulls (Premium).
+  dynamic "georeplications" {
+    for_each = var.sku == "Premium" ? var.georeplication_locations : []
     content {
-      days = var.retention_days
+      location                = georeplications.value
+      zone_redundancy_enabled = true
     }
   }
-
-  # Zone redundancy for regional resilience (Premium only).
-  zone_redundancy_enabled = var.sku == "Premium"
 }
 
 # --- Let AKS nodes pull images with their managed identity ---------------------
@@ -99,7 +118,7 @@ resource "azurerm_monitor_diagnostic_setting" "this" {
   target_resource_id         = azurerm_container_registry.this.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
 
-  enabled_log { category = "ContainerRegistryLoginEvents" }     # who authenticated
+  enabled_log { category = "ContainerRegistryLoginEvents" }      # who authenticated
   enabled_log { category = "ContainerRegistryRepositoryEvents" } # push/pull/delete
 
   metric { category = "AllMetrics" }

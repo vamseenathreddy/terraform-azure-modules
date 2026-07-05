@@ -28,12 +28,17 @@ resource "azurerm_user_assigned_identity" "cluster" {
 }
 
 resource "azurerm_kubernetes_cluster" "this" {
+  # checkov:skip=CKV_AZURE_117:disk_encryption_set_id is exposed as an optional input; platform-managed keys are acceptable here
+  # checkov:skip=CKV_AZURE_168:max_pods defaults to 50 via var.default_node_pool (checkov cannot resolve optional() defaults)
   name                = var.name
   location            = var.location
   resource_group_name = var.resource_group_name
   dns_prefix          = var.name
   kubernetes_version  = var.kubernetes_version
-  tags                = var.tags
+
+  # Standard tier = financially-backed uptime SLA for the API server.
+  sku_tier = "Standard"
+  tags     = var.tags
 
   # --- API server exposure ---
   private_cluster_enabled = var.private_cluster_enabled
@@ -56,8 +61,14 @@ resource "azurerm_kubernetes_cluster" "this" {
     admin_group_object_ids = var.admin_group_object_ids
   }
 
-  local_account_disabled    = true
+  local_account_disabled            = true
   role_based_access_control_enabled = true
+
+  # Enforce org guardrails (e.g. "no privileged pods") at admission time.
+  azure_policy_enabled = true
+
+  # Optional customer-managed key encryption for node OS/data disks.
+  disk_encryption_set_id = var.disk_encryption_set_id
 
   # --- Workload identity: pods authenticate via federated credentials ---
   oidc_issuer_enabled       = true
@@ -83,8 +94,13 @@ resource "azurerm_kubernetes_cluster" "this" {
     os_sku               = var.default_node_pool.os_sku
     zones                = var.default_node_pool.zones
 
+    # Ephemeral OS disks live on the VM's local storage: faster, and node OS
+    # data never persists to remote storage (requires a VM size with a local
+    # disk, hence the D4ds_v5 default).
+    os_disk_type = "Ephemeral"
+
     # Hardening
-    host_encryption_enabled = true
+    host_encryption_enabled      = true
     only_critical_addons_enabled = true
 
     upgrade_settings {

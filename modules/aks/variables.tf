@@ -45,14 +45,20 @@ variable "authorized_ip_ranges" {
 variable "default_node_pool" {
   description = "Default (system) node pool settings."
   type = object({
-    vm_size    = optional(string, "Standard_D4s_v5")
-    min_count  = optional(number, 2)
-    max_count  = optional(number, 5)
-    os_sku     = optional(string, "AzureLinux")
-    max_pods   = optional(number, 50)
-    zones      = optional(list(string), ["1", "2", "3"])
+    vm_size   = optional(string, "Standard_D4ds_v5")
+    min_count = optional(number, 2)
+    max_count = optional(number, 5)
+    os_sku    = optional(string, "AzureLinux")
+    max_pods  = optional(number, 50)
+    zones     = optional(list(string), ["1", "2", "3"])
   })
   default = {}
+}
+
+variable "disk_encryption_set_id" {
+  description = "Optional Disk Encryption Set ID for customer-managed key encryption of node disks."
+  type        = string
+  default     = null
 }
 
 variable "log_analytics_workspace_id" {

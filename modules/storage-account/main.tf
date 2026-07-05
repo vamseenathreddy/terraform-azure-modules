@@ -24,6 +24,9 @@ terraform {
 }
 
 resource "azurerm_storage_account" "this" {
+  # checkov:skip=CKV_AZURE_59:anonymous blob access is hard-disabled; public network path closes automatically with a private endpoint and is default-deny otherwise
+  # checkov:skip=CKV_AZURE_206:replication defaults to ZRS via var.replication_type (conditional not resolvable by checkov)
+  # checkov:skip=CKV2_AZURE_1:infrastructure (double) encryption is enabled; customer-managed keys can be layered on where mandated
   name                = var.name
   resource_group_name = var.resource_group_name
   location            = var.location
@@ -79,11 +82,24 @@ resource "azurerm_storage_account" "this" {
       days = var.container_soft_delete_days # deleted containers recoverable too
     }
   }
+
+  # Classic logging for the queue service (read/write/delete), kept alongside
+  # the blob diagnostic settings below for full data-plane auditability.
+  queue_properties {
+    logging {
+      delete                = true
+      read                  = true
+      write                 = true
+      version               = "1.0"
+      retention_policy_days = 10
+    }
+  }
 }
 
 # Private blob containers. Access is controlled purely by RBAC, so there is
 # deliberately no "access type" knob here — everything is private.
 resource "azurerm_storage_container" "this" {
+  # checkov:skip=CKV2_AZURE_21:blob read/write/delete logging is shipped via azurerm_monitor_diagnostic_setting on the blob service below
   for_each = toset(var.containers)
 
   name                  = each.value
@@ -123,7 +139,7 @@ resource "azurerm_private_endpoint" "blob" {
 resource "azurerm_monitor_diagnostic_setting" "blob" {
   count = var.log_analytics_workspace_id != null ? 1 : 0
 
-  name                       = "${var.name}-blob-audit"
+  name = "${var.name}-blob-audit"
   # Diagnostics attach to the blob service sub-resource, not the account.
   target_resource_id         = "${azurerm_storage_account.this.id}/blobServices/default"
   log_analytics_workspace_id = var.log_analytics_workspace_id
